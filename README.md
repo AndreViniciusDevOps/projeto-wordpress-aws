@@ -1,100 +1,167 @@
-# Projeto: WordPress de Alta Disponibilidade na AWS
+# Projeto WordPress com Alta Disponibilidade na AWS
 
-## 1. Visão Geral
-Este projeto documenta a implementação de uma arquitetura **WordPress** na nuvem **AWS**, projetada para ser **altamente disponível, escalável e resiliente**.  
-Utilizando uma abordagem de **contentores com Docker** e os principais serviços gerenciados da AWS, a infraestrutura simula um ambiente de produção real, capaz de suportar falhas de componentes sem indisponibilidade e escalar dinamicamente de acordo com a demanda.
+Este projeto implementa uma infraestrutura de **alta disponibilidade**, **segurança** e **escalabilidade automática** para hospedar o WordPress na **AWS**, utilizando **Docker**, **RDS**, **EFS**, **VPC customizada** e **Auto Scaling Group**.
+
+---
+
+## 1. Objetivo
+
+- Garantir **alta disponibilidade** para WordPress  
+- Separar **camadas de aplicação, dados e armazenamento**  
+- Usar **Docker Compose** para simplificar a execução do WordPress  
+- Prover **segurança com IAM, Secrets Manager e Security Groups**  
+- Escalar automaticamente com **Auto Scaling Group**
 
 ---
 
 ## 2. Arquitetura da Solução
-A solução segue um design **multi-tier** (múltiplos níveis) para garantir segurança e desacoplamento entre os componentes.
 
-- **Ponto de Entrada (ALB)**: Um *Application Load Balancer (ALB)* público serve como o único ponto de entrada para todo o tráfego dos utilizadores.  
-  - Distribuído em **2 Zonas de Disponibilidade (AZs)**.  
-  - Encaminha requisições apenas para instâncias saudáveis.  
+### 2.1. Componentes principais
 
-- **Camada de Aplicação (EC2 & ASG)**:  
-  - O WordPress é executado em contentores Docker dentro de **instâncias EC2**.  
-  - As instâncias são geridas por um **Auto Scaling Group (ASG)** com 2 instâncias mínimas em **sub-redes privadas**, garantindo isolamento da internet.  
+- **Camada de Aplicação (EC2 + Docker Compose)**  
+  - Instâncias EC2 executam WordPress em containers  
+  - Auto Scaling Group garante elasticidade  
+- **Balanceamento (ALB)**  
+  - Application Load Balancer distribui o tráfego entre instâncias  
+- **Camada de Dados (RDS)**  
+  - Banco MySQL no Amazon RDS em sub-redes privadas  
+  - Apenas a camada de aplicação pode acessá-lo  
+- **Camada de Armazenamento (EFS)**  
+  - Diretório `wp-content` montado no Amazon EFS  
+  - Todos os conteúdos do WordPress permanecem consistentes  
+- **Segurança e Acesso**  
+  - Segmentação em **sub-redes públicas e privadas**  
+  - **Security Groups** controlam o tráfego  
+  - **IAM Role** para EC2 acessar Secrets Manager  
+  - **Bastion Host** para acesso administrativo seguro  
 
-- **Camada de Dados (RDS)**:  
-  - Banco de dados **MySQL no Amazon RDS** em sub-redes privadas.  
-  - Apenas a camada de aplicação pode se conectar a ele.  
+### 2.2. Diagrama da Arquitetura
 
-- **Camada de Armazenamento de Ficheiros (EFS)**:  
-  - O diretório `wp-content` é montado no **Amazon EFS**.  
-  - Todos os contentores WordPress compartilham o mesmo estado.  
-
-- **Segurança e Acesso**:  
-  - Segmentação em **sub-redes públicas e privadas**.  
-  - **Security Groups** controlam tráfego entre componentes.  
-  - **Bastion Host** garante acesso administrativo seguro às instâncias privadas.  
-
-### Diagrama da Arquitetura
-![Diagrama da Arquitetura](Diagrama.png)
+![Diagrama da Arquitetura](./Diagrama.png)
 
 ---
 
-## 3. Implementação e Configuração Detalhada
+## 3. Implementação e Configuração Ideal
 
 ### 3.1. Rede (VPC)
-- Criada uma VPC customizada com o assistente **“VPC e mais”**.  
-- **2 AZs** para alta disponibilidade.  
-- **Sub-redes**:  
-  - 2 públicas (ALB + Bastion Host).  
-  - 2 privadas (EC2 + RDS).  
-- **Gateways**:  
-  - **Internet Gateway** → acesso para sub-redes públicas.  
-  - **NAT Gateway** → acesso à internet para recursos privados.  
 
-### 3.2. Imagem do Servidor (AMI) e Automação
-- Criada AMI customizada a partir do **Amazon Linux 2023**.  
-- Instalação de **Docker e Docker Compose**.  
-- Criado arquivo `docker-compose.yml` seguro, com credenciais lidas de **variáveis de ambiente** (sem exposição de senhas).  
+1. Crie uma VPC customizada com o assistente **"VPC e mais"**  
+2. Configure **duas zonas de disponibilidade (AZs)**  
+3. Crie as sub-redes:  
+   - 2 públicas (para ALB e Bastion Host)  
+   - 2 privadas (para EC2 e RDS)  
+4. Configure os gateways:  
+   - **Internet Gateway** para saída das sub-redes públicas  
+   - **NAT Gateway** para saída das sub-redes privadas
+
+---
+
+### 3.2. Arquivo `.env`
+
+Crie um arquivo `.env` com as variáveis de ambiente para uso no `docker-compose.yml`:
+
+```ini
+WORDPRESS_DB_HOST=[SEU_ENDPOINT_RDS]
+WORDPRESS_DB_USER=andre
+WORDPRESS_DB_PASSWORD=[SENHA_AWS_SECRETS_MANAGER]
+WORDPRESS_DB_NAME=wordpress
+```
+
+---
 
 ### 3.3. Launch Template e User Data
-Configurado um **Launch Template** com:  
-- AMI customizada.  
-- Instância **t2.micro**.  
-- **Security Group**: `wordpress-ec2-sg`.  
-- **Perfil IAM**: `EC2-WordPress-Role` (acesso ao Secrets Manager).  
-- **User Data Script**:  
-  - Busca senha no **AWS Secrets Manager**.  
-  - Monta **EFS**.  
-  - Exporta credenciais como variáveis de ambiente.  
-  - Executa `docker compose up -d`.  
 
-### 3.4. Auto Scaling Group (ASG)
-- Baseado no Launch Template.  
-- Capacidade mínima/desejada: **2 instâncias**.  
-- Capacidade máxima: **4 instâncias**.  
-- Política de escalonamento: **CPU média 50%**.  
+Crie um **Launch Template** com as seguintes configurações:
 
-### 3.5. Application Load Balancer (ALB)
-- Posicionado em **sub-redes públicas**.  
-- Criado Target Group `wordpress-tg` com **health check** customizado (`200` e `302`).  
-- Integrado ao ASG para registro/deregistro automático das instâncias.  
+- **AMI customizada** (Amazon Linux 2 com Docker instalado)
+- **Instância t2.micro**
+- **Security Group**: `wordpress-ec2-sg`
+- **IAM Role**: `EC2-WordPress-Role` com acesso ao Secrets Manager
+
+Adicione o seguinte script no campo **User Data**:
+
+```bash
+#!/bin/bash
+# Script de inicialização seguro para instâncias WordPress
+
+# Obtém a Região da AWS a partir dos metadados da instância
+REGION=$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | grep region | awk -F\" '{print $4}')
+
+# --- Variáveis de Configuração ---
+SECRET_NAME="wordpress/database/password"
+DB_HOST_ENDPOINT="[SEU_ENDPOINT_DO_RDS]"
+DB_USER="andre"
+DB_NAME="wordpress"
+EFS_ID="[SEU_EFS_ID]"
+
+# --- Busca Segura de Credenciais ---
+DB_PASSWORD=$(aws secretsmanager get-secret-value --secret-id $SECRET_NAME --region $REGION --query SecretString --output text | awk -F: '{print $2}' | sed 's/,"//' | sed 's/"}//')
+
+# --- Preparação do Ambiente ---
+cd /home/ec2-user
+
+# Monta o sistema de ficheiros EFS
+sudo mkdir -p /mnt/efs
+sudo mount -t efs -o tls ${EFS_ID}:/ /mnt/efs
+echo "${EFS_ID}:/ /mnt/efs efs _netdev,tls 0 0" | sudo tee -a /etc/fstab
+
+# --- Execução da Aplicação ---
+export WORDPRESS_DB_HOST=${DB_HOST_ENDPOINT}
+export WORDPRESS_DB_USER=${DB_USER}
+export WORDPRESS_DB_PASSWORD=${DB_PASSWORD}
+export WORDPRESS_DB_NAME=${DB_NAME}
+docker compose up -d
+```
 
 ---
 
-## 4. Atividades Extras
+### 3.4. Arquivo `docker-compose.yml`
 
-### 4.1. Monitorização com CloudWatch
-Criado dashboard `wordpress-dashboard` no **Amazon CloudWatch** com:  
-- CPU média do ASG.  
-- Contagem de requisições no ALB.  
-- Conexões do banco de dados RDS.  
+Crie o arquivo `docker-compose.yml` com o seguinte conteúdo:
 
-### 4.2. Teste de Escalabilidade
-- Executado **teste de carga** para validar política do ASG.  
-- Utilizado **Bastion Host** para simular carga.  
-- O ASG escalou para uma 3ª instância durante o teste e reduziu automaticamente após.  
+```yaml
+version: "3.8"
+services:
+  wordpress:
+    image: wordpress:latest
+    container_name: wordpress
+    restart: always
+    ports:
+      - "80:80"
+    environment:
+      WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
+    volumes:
+      - /mnt/efs:/var/www/html/wp-content
+```
 
 ---
 
-## 5. Ambiente de Desenvolvimento Local
-Para executar o projeto localmente:
+### 3.5. Segurança
 
-1. Crie um arquivo **`.env`** com:  
-   ```env
-   MYSQL_PASSWORD=SUA_SENHA_FORTE_AQUI
+- **IAM Roles**: EC2 acessa apenas o necessário (Secrets Manager)
+- **Segurança em Camadas**:
+  - ALB público → EC2 privado → RDS privado
+- **EFS com TLS**: garante criptografia no transporte
+
+---
+
+### 3.6. Escalabilidade
+
+- **Auto Scaling Group** aumenta ou diminui instâncias EC2 conforme demanda
+- **ALB** garante distribuição automática do tráfego
+- **EFS** mantém conteúdo sincronizado entre instâncias
+
+---
+
+### 3.7. Conclusão
+
+Essa arquitetura garante:
+
+✅ **Alta disponibilidade** com múltiplas AZs e Auto Scaling  
+✅ **Segurança em múltiplas camadas** com IAM, SGs e rede segmentada  
+✅ **Escalabilidade automática** com ASG e ALB  
+✅ **Separação clara de responsabilidades** entre aplicação, dados e armazenamento  
+✅ **Persistência de dados** com RDS para o banco e EFS para o conteúdo do WordPress
