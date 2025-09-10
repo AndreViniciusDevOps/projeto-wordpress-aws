@@ -270,7 +270,6 @@ Para garantir a saúde, a performance e o controle de custos da nossa infraestru
     * `ReadIOPS` e `WriteIOPS`: As operações de leitura e escrita por segundo. Ajudam a entender a carga de trabalho do banco de dados e a otimizar consultas lentas.
     * **Onde:** CloudWatch > Metrics > RDS.
 
-Criar **dashboards** personalizados no CloudWatch para visualizar essas métricas em um único local é uma prática recomendada para ter uma visão completa da saúde da arquitetura em tempo real.
 ## 4. Conclusão
 
 Essa arquitetura garante:
