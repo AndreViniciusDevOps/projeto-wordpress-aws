@@ -8,13 +8,6 @@ Utilizando uma abordagem de **contentores com Docker** e os principais serviços
 
 ## 2. Arquitetura da Solução
 A solução segue um design **multi-tier** (múltiplos níveis) para garantir segurança e desacoplamento entre os componentes.
-## 2. Arquitetura da Solução
-
-(Explicação do ALB, EC2, RDS, EFS, etc.)
-
-### Diagrama da Arquitetura
-![Diagrama da Arquitetura](A_2D_digital_diagram_illustrates_a_highly_availabl.png)
-
 
 - **Ponto de Entrada (ALB)**: Um *Application Load Balancer (ALB)* público serve como o único ponto de entrada para todo o tráfego dos utilizadores.  
   - Distribuído em **2 Zonas de Disponibilidade (AZs)**.  
@@ -37,7 +30,8 @@ A solução segue um design **multi-tier** (múltiplos níveis) para garantir se
   - **Security Groups** controlam tráfego entre componentes.  
   - **Bastion Host** garante acesso administrativo seguro às instâncias privadas.  
 
-> **Sugestão**: inserir aqui um diagrama da arquitetura.
+### Diagrama da Arquitetura
+![Diagrama da Arquitetura](Diagrama.png)
 
 ---
 
