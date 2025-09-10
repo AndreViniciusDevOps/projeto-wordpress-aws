@@ -1,0 +1,8 @@
+# Ignorar o arquivo de variáveis de ambiente que contém segredos
+.env
+
+# Ignorar a pasta do WordPress que será baixada e modificada
+/wordpress/
+
+# Ignorar a pasta de dados do banco de dados
+db_data/
