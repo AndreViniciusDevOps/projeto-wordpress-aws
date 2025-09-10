@@ -243,7 +243,34 @@ services:
       # Mapeia o diretório compartilhado do EFS para o wp-content do container
       - /mnt/efs:/var/www/html/wp-content
 ```
+### 3.8. Monitoramento com Amazon CloudWatch
 
+Para garantir a saúde, a performance e o controle de custos da nossa infraestrutura, o monitoramento contínuo é essencial. O Amazon CloudWatch é integrado nativamente aos serviços da AWS que utilizamos e nos fornece as métricas necessárias para observar o comportamento da aplicação.
+
+#### 3.8.1. Monitoramento da Camada de Aplicação (EC2 e Auto Scaling)
+
+* **Métrica Principal:** `CPUUtilization` (Utilização da CPU)
+    * **Onde:** CloudWatch > Metrics > EC2 > By Auto Scaling Group.
+    * **Por que é importante:** Esta é a métrica que nossa **política de escalabilidade** utiliza. Configuramos o Auto Scaling Group para adicionar novas instâncias EC2 quando a utilização média da CPU ultrapassa 50%, garantindo que o site permaneça rápido durante picos de tráfego. Também configuramos para remover instâncias quando a carga diminui, otimizando os custos.
+    * **Alarme:** O próprio Auto Scaling Group cria um alarme no CloudWatch para monitorar essa métrica e acionar as ações de `Scale-out` (adicionar instâncias) e `Scale-in` (remover instâncias).
+
+#### 3.8.2. Monitoramento do Balanceador de Carga (ALB)
+
+* **Métricas Principais:**
+    * `RequestCount`: O número total de requisições que o ALB processou. Ajuda a entender os padrões de tráfego (horários de pico, etc.).
+    * `TargetConnectionErrorCount`: O número de conexões que não foram estabelecidas com sucesso entre o ALB e as instâncias. Um aumento aqui pode indicar que as instâncias EC2 estão sobrecarregadas ou com problemas.
+    * `HTTPCode_Target_5XX_Count`: A contagem de erros do lado do servidor (códigos 500-599). É um indicador crítico de problemas na aplicação WordPress ou no servidor web.
+    * **Onde:** CloudWatch > Metrics > ApplicationELB.
+
+#### 3.8.3. Monitoramento da Camada de Dados (RDS)
+
+* **Métricas Principais:**
+    * `CPUUtilization`: A utilização da CPU da instância do banco de dados. Picos constantes podem indicar a necessidade de uma instância mais potente (upgrade).
+    * `DatabaseConnections`: O número de conexões ativas com o banco de dados. Um aumento súbito e inesperado pode indicar problemas na aplicação ou um ataque.
+    * `ReadIOPS` e `WriteIOPS`: As operações de leitura e escrita por segundo. Ajudam a entender a carga de trabalho do banco de dados e a otimizar consultas lentas.
+    * **Onde:** CloudWatch > Metrics > RDS.
+
+Criar **dashboards** personalizados no CloudWatch para visualizar essas métricas em um único local é uma prática recomendada para ter uma visão completa da saúde da arquitetura em tempo real.
 ## 4. Conclusão
 
 Essa arquitetura garante:
